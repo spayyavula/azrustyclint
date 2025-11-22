@@ -4,8 +4,9 @@ FROM rust:1.82-bookworm AS builder
 WORKDIR /app
 COPY . .
 
-# Pin base64ct to avoid edition2024 requirement
-RUN cargo update -p base64ct --precise 1.6.0
+# Pin packages to avoid edition2024 requirement
+RUN cargo update -p base64ct --precise 1.6.0 && \
+    cargo update -p home --precise 0.5.9
 RUN cargo build --release --bin rustyclint
 
 # Runtime stage
