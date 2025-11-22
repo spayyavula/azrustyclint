@@ -15,9 +15,6 @@ license = "MIT"
 repository = "https://github.com/yourusername/rustyclint"
 
 [workspace.dependencies]
-# Pin base64ct to avoid edition2024 requirement
-base64ct = ">=1.0.0, <1.8.0"
-
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 
