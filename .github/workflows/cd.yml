@@ -52,7 +52,7 @@ jobs:
         uses: dtolnay/rust-toolchain@1.83
 
       - name: Install sqlx-cli
-        run: cargo install sqlx-cli --no-default-features --features postgres
+        run: cargo install sqlx-cli@0.7.4 --no-default-features --features postgres
 
       - name: Run migrations and prepare sqlx cache
         env:
