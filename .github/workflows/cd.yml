@@ -30,8 +30,39 @@ jobs:
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rustyclint
+          POSTGRES_PASSWORD: rustyclint
+          POSTGRES_DB: rustyclint
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          toolchain: 1.83
+
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli --no-default-features --features postgres
+
+      - name: Run migrations and prepare sqlx cache
+        env:
+          DATABASE_URL: postgres://rustyclint:rustyclint@localhost:5432/rustyclint
+        run: |
+          cargo sqlx database create
+          cargo sqlx migrate run
+          cargo sqlx prepare --workspace
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
