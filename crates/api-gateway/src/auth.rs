@@ -1,5 +1,6 @@
 //! Authentication and authorization.
 
+use async_trait::async_trait;
 use axum::{
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
@@ -28,6 +29,7 @@ pub struct AuthUser {
     pub email: String,
 }
 
+#[async_trait]
 impl FromRequestParts<AppState> for AuthUser {
     type Rejection = AuthError;
 
