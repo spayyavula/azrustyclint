@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use yrs::{Doc, ReadTxn, Text, Transact, Update};
+use yrs::updates::encoder::Encode;
+use yrs::{Doc, GetString, ReadTxn, Text, Transact, Update};
 
 /// A collaborative document backed by a Yjs CRDT.
 pub struct CollabDocument {
