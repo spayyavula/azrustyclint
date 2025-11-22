@@ -7,6 +7,9 @@ COPY . .
 # Pin packages to avoid edition2024 requirement
 RUN cargo update -p base64ct --precise 1.6.0 && \
     cargo update -p home --precise 0.5.9
+
+# Build with sqlx offline mode (uses .sqlx cache generated in CI)
+ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin rustyclint
 
 # Runtime stage
