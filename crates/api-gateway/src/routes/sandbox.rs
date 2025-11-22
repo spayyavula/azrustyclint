@@ -40,8 +40,8 @@ pub struct SessionResponse {
 }
 
 #[derive(Serialize)]
-struct ErrorResponse {
-    error: String,
+pub struct ErrorResponse {
+    pub error: String,
 }
 
 // Lazy-initialized executor

@@ -37,8 +37,8 @@ pub struct FileResponse {
 }
 
 #[derive(Serialize)]
-struct ErrorResponse {
-    error: String,
+pub struct ErrorResponse {
+    pub error: String,
 }
 
 pub async fn create(
