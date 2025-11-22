@@ -1,5 +1,5 @@
 # Build stage
-FROM rustlang/rust:nightly-bookworm AS builder
+FROM rust:1.82-bookworm AS builder
 
 WORKDIR /app
 COPY . .
