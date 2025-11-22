@@ -1,5 +1,6 @@
 # Node.js sandbox image (JavaScript/TypeScript)
-FROM rustyclint/sandbox-base:latest
+ARG BASE_IMAGE=rustyclint/sandbox-base:latest
+FROM ${BASE_IMAGE}
 
 USER root
 
