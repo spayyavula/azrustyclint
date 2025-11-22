@@ -1,0 +1,20 @@
+[package]
+name = "rustyclint-collab"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rustyclint-common = { path = "../common" }
+
+tokio.workspace = true
+yrs.workspace = true
+y-sync.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+# For broadcast channels
+tokio-stream = "0.1"
+dashmap = "5"

@@ -1,0 +1,15 @@
+# RustyClint Default Configuration
+
+port = 3000
+
+# Database (override in local.toml or environment)
+database_url = "postgres://rustyclint:rustyclint@localhost:5432/rustyclint"
+redis_url = "redis://localhost:6379"
+
+# JWT Configuration
+jwt_secret = "change-me-in-production"
+jwt_expiry_hours = 24
+
+# Sandbox Configuration
+sandbox_timeout_secs = 300
+max_containers_per_user = 3

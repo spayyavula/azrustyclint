@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      RUSTYCLINT_DATABASE_URL: postgres://rustyclint:rustyclint@postgres:5432/rustyclint
+      RUSTYCLINT_REDIS_URL: redis://redis:6379
+      RUSTYCLINT_JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      RUST_LOG: info,tower_http=debug
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rustyclint
+      POSTGRES_PASSWORD: rustyclint
+      POSTGRES_DB: rustyclint
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+  redis_data:

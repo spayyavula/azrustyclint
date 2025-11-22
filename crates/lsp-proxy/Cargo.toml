@@ -1,0 +1,18 @@
+[package]
+name = "rustyclint-lsp-proxy"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rustyclint-common = { path = "../common" }
+
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+# LSP support
+lsp-types = "0.95"
+tower-lsp = "0.20"

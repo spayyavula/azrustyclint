@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rustyclint-config
+  namespace: rustyclint
+data:
+  RUST_LOG: "info"
+  SERVER_HOST: "0.0.0.0"
+  SERVER_PORT: "8080"
+  SANDBOX_TIMEOUT_SECONDS: "30"
+  SANDBOX_MEMORY_LIMIT_MB: "512"
+  SANDBOX_CPU_LIMIT: "1"

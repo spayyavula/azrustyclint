@@ -1,0 +1,17 @@
+[package]
+name = "rustyclint-sandbox"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rustyclint-common = { path = "../common" }
+
+tokio.workspace = true
+bollard.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+futures-util = "0.3"
