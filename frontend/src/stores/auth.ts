@@ -5,15 +5,19 @@ import type { User } from '../types'
 interface AuthState {
   token: string | null
   user: User | null
+  isAuthenticated: boolean
   setAuth: (token: string, user: User) => void
   logout: () => void
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       token: null,
       user: null,
+      get isAuthenticated() {
+        return !!get().token
+      },
       setAuth: (token, user) => {
         localStorage.setItem('token', token)
         set({ token, user })
