@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: rustyclint
+      POSTGRES_PASSWORD: rustyclint
+      POSTGRES_DB: rustyclint
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rustyclint"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Cache
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # API Backend
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    environment:
+      RUSTYCLINT_PORT: "3000"
+      RUSTYCLINT_DATABASE_URL: "postgres://rustyclint:rustyclint@postgres:5432/rustyclint"
+      RUSTYCLINT_REDIS_URL: "redis://redis:6379"
+      RUSTYCLINT_JWT_SECRET: "e2e-test-jwt-secret-change-in-production"
+      RUSTYCLINT_JWT_EXPIRY_HOURS: "24"
+      RUSTYCLINT_SANDBOX_TIMEOUT_SECS: "300"
+      RUSTYCLINT_MAX_CONTAINERS_PER_USER: "3"
+      RUST_LOG: "info,tower_http=debug"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # Frontend
+  web:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: "https://localhost/api/v1"
+        VITE_WS_BASE_URL: "wss://localhost/ws"
+    depends_on:
+      - api
+
+  # NGINX reverse proxy with HTTPS
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/ssl:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
