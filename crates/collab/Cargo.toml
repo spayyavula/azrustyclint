@@ -17,4 +17,4 @@ tracing.workspace = true
 
 # For broadcast channels
 tokio-stream = "0.1"
-dashmap = "5"
+dashmap = "6"

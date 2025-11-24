@@ -14,5 +14,5 @@ thiserror.workspace = true
 tracing.workspace = true
 
 # LSP support
-lsp-types = "0.95"
+lsp-types = "0.97"
 tower-lsp = "0.20"
