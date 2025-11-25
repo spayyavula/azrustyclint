@@ -71,11 +71,11 @@ jobs:
           # Install sqlx-cli for offline query preparation
           cargo install sqlx-cli --no-default-features --features postgres
 
-          # Generate query cache using the postgres service
+          # Generate query cache using the postgres service (workspace mode)
           DATABASE_URL=postgres://rustyclint:rustyclint@localhost:5432/rustyclint \
-            cargo sqlx prepare --check || \
+            cargo sqlx prepare --workspace --check || \
             DATABASE_URL=postgres://rustyclint:rustyclint@localhost:5432/rustyclint \
-            cargo sqlx prepare
+            cargo sqlx prepare --workspace
         env:
           DATABASE_URL: postgres://rustyclint:rustyclint@localhost:5432/rustyclint
 
