@@ -34,21 +34,6 @@ jobs:
       resource_group: ${{ steps.set-env.outputs.resource_group }}
       aks_name: ${{ steps.set-env.outputs.aks_name }}
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: rustyclint
-          POSTGRES_PASSWORD: rustyclint
-          POSTGRES_DB: rustyclint
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
 
@@ -66,20 +51,6 @@ jobs:
             echo "resource_group=${{ env.AZURE_RESOURCE_GROUP_STAGING }}" >> $GITHUB_OUTPUT
             echo "aks_name=${{ env.AKS_NAME_STAGING }}" >> $GITHUB_OUTPUT
           fi
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.83
-
-      - name: Install sqlx-cli
-        run: cargo install sqlx-cli@0.7.4 --no-default-features --features postgres
-
-      - name: Run migrations and prepare sqlx cache
-        env:
-          DATABASE_URL: postgres://rustyclint:rustyclint@localhost:5432/rustyclint
-        run: |
-          cargo sqlx database create
-          cargo sqlx migrate run
-          cargo sqlx prepare --workspace
 
       - name: Azure Login
         uses: azure/login@v1
