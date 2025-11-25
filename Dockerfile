@@ -8,8 +8,7 @@ COPY . .
 RUN cargo update -p base64ct --precise 1.6.0 && \
     cargo update -p home --precise 0.5.9
 
-# Build with sqlx offline mode (uses .sqlx cache generated in CI)
-ENV SQLX_OFFLINE=true
+# Build (DATABASE_URL will be provided at build time)
 RUN cargo build --release --bin rustyclint
 
 # Runtime stage

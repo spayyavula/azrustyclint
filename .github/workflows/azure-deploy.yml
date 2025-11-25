@@ -34,6 +34,21 @@ jobs:
       resource_group: ${{ steps.set-env.outputs.resource_group }}
       aks_name: ${{ steps.set-env.outputs.aks_name }}
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rustyclint
+          POSTGRES_PASSWORD: rustyclint
+          POSTGRES_DB: rustyclint
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -82,6 +97,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            DATABASE_URL=postgres://rustyclint:rustyclint@postgres:5432/rustyclint
+          network: host
 
   deploy:
     name: Deploy to AKS
