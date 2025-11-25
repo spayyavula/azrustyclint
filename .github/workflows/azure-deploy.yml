@@ -98,7 +98,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            DATABASE_URL=postgres://rustyclint:rustyclint@postgres:5432/rustyclint
+            DATABASE_URL=postgres://rustyclint:rustyclint@localhost:5432/rustyclint
           network: host
 
   deploy:
