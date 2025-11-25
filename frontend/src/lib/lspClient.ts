@@ -15,8 +15,9 @@ export class LSPClient {
 
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
+      const wsBaseUrl = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
       this.ws = new WebSocket(
-        `ws://${window.location.host}/ws/lsp/${this.sessionId}/${this.language}`
+        `${wsBaseUrl}/lsp/${this.sessionId}/${this.language}`
       )
 
       this.ws.onopen = () => {

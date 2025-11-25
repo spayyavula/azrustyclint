@@ -65,6 +65,14 @@ impl CollabDocument {
         txn.state_vector().encode_v1()
     }
 
+    /// Encode state as update based on a client's state vector (for sync step 2).
+    pub async fn encode_diff(&self, state_vector: &[u8]) -> Result<Vec<u8>, yrs::encoding::read::Error> {
+        let doc = self.doc.read().await;
+        let txn = doc.transact();
+        let sv = yrs::StateVector::decode_v1(state_vector)?;
+        Ok(txn.encode_state_as_update_v1(&sv))
+    }
+
     /// Get the document content as plain text.
     pub async fn get_content(&self) -> String {
         let doc = self.doc.read().await;

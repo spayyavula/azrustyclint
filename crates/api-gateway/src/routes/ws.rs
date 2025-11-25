@@ -90,12 +90,11 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
     // Join room and get broadcast receiver
     let mut broadcast_rx = room.join(user_id, username.clone());
 
-    // Send initial document state
-    let initial_state = room.document.encode_state().await;
-    let init_msg = ServerMessage::InitialState { data: initial_state };
-    if let Ok(json) = serde_json::to_string(&init_msg) {
-        let _ = sender.send(Message::Text(json)).await;
-    }
+    // Send initial sync step 1 (server's state vector)
+    let state_vector = room.document.state_vector().await;
+    let mut sync_step1 = vec![0u8]; // message type 0
+    sync_step1.extend_from_slice(&state_vector);
+    let _ = sender.send(Message::Binary(sync_step1)).await;
 
     // Notify others of join
     let join_msg = serde_json::to_vec(&ServerMessage::UserJoined {
@@ -168,16 +167,52 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
                     }
 
                     Ok(Message::Binary(data)) => {
-                        // Handle binary CRDT updates directly
-                        if let Err(e) = room.document.apply_update(&data).await {
-                            tracing::error!("Failed to apply binary update: {}", e);
+                        // Handle y-websocket protocol messages
+                        if data.is_empty() {
                             continue;
                         }
 
-                        // Broadcast to others
-                        let update_msg = serde_json::to_vec(&ServerMessage::Update { data })
-                            .unwrap_or_default();
-                        room.broadcast_update(update_msg);
+                        let msg_type = data[0];
+                        let payload = &data[1..];
+
+                        match msg_type {
+                            0 => {
+                                // Sync step 1: client sends state vector, respond with diff
+                                match room.document.encode_diff(payload).await {
+                                    Ok(diff) => {
+                                        // Send sync step 2 response
+                                        let mut response = vec![1u8]; // message type 1
+                                        response.extend_from_slice(&diff);
+                                        let _ = sender.send(Message::Binary(response)).await;
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Failed to encode diff: {}", e);
+                                    }
+                                }
+                            }
+                            1 => {
+                                // Sync step 2: apply the update
+                                if let Err(e) = room.document.apply_update(payload).await {
+                                    tracing::error!("Failed to apply sync step 2: {}", e);
+                                }
+                            }
+                            2 => {
+                                // Update: apply and broadcast
+                                if let Err(e) = room.document.apply_update(payload).await {
+                                    tracing::error!("Failed to apply update: {}", e);
+                                    continue;
+                                }
+
+                                // Broadcast to others (with message type prefix)
+                                let mut broadcast_data = vec![2u8];
+                                broadcast_data.extend_from_slice(payload);
+                                room.broadcast_update(broadcast_data);
+                            }
+                            _ => {
+                                // Unknown message type (could be awareness, etc.)
+                                tracing::debug!("Unknown y-websocket message type: {}", msg_type);
+                            }
+                        }
                     }
 
                     Ok(Message::Close(_)) => break,

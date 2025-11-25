@@ -18,7 +18,8 @@ export default function Terminal({ sessionId, onClose }: TerminalProps) {
 
   useEffect(() => {
     // Connect to terminal WebSocket
-    const ws = new WebSocket(`ws://${window.location.host}/ws/terminal/${sessionId}`)
+    const wsBaseUrl = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
+    const ws = new WebSocket(`${wsBaseUrl}/terminal/${sessionId}`)
     wsRef.current = ws
 
     ws.onopen = () => {

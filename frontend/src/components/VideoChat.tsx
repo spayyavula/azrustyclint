@@ -32,7 +32,8 @@ export default function VideoChat({ roomId, userId }: VideoChatProps) {
       }
 
       // Connect to signaling server
-      const ws = new WebSocket(`ws://${window.location.host}/ws/signaling/${roomId}`)
+      const wsBaseUrl = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
+      const ws = new WebSocket(`${wsBaseUrl}/signaling/${roomId}`)
       wsRef.current = ws
 
       ws.onopen = () => {

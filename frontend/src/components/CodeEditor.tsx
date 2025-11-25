@@ -41,8 +41,9 @@ export default function CodeEditor({
     }
 
     // Create WebSocket provider for collaboration
+    const wsBaseUrl = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
     const wsProvider = new WebsocketProvider(
-      `ws://${window.location.host}/ws/collab`,
+      `${wsBaseUrl}/collab`,
       fileId,
       ydoc
     )
