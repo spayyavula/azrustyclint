@@ -29,6 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
+      environment: ${{ steps.set-env.outputs.environment }}
+      acr_name: ${{ steps.set-env.outputs.acr_name }}
+      resource_group: ${{ steps.set-env.outputs.resource_group }}
+      aks_name: ${{ steps.set-env.outputs.aks_name }}
 
     services:
       postgres:
@@ -107,12 +111,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-    outputs:
-      environment: ${{ steps.set-env.outputs.environment }}
-      acr_name: ${{ steps.set-env.outputs.acr_name }}
-      resource_group: ${{ steps.set-env.outputs.resource_group }}
-      aks_name: ${{ steps.set-env.outputs.aks_name }}
 
   deploy:
     name: Deploy to AKS
