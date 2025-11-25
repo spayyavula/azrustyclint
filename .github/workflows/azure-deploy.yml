@@ -70,6 +70,11 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.83
 
+      - name: Pin packages to avoid edition2024 requirement
+        run: |
+          cargo update -p base64ct --precise 1.6.0
+          cargo update -p home --precise 0.5.9
+
       - name: Install sqlx-cli
         run: cargo install sqlx-cli --no-default-features --features postgres
 
