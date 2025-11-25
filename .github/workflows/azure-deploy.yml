@@ -52,6 +52,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Generate sqlx query cache
+        run: |
+          # Install sqlx-cli for offline query preparation
+          cargo install sqlx-cli --no-default-features --features postgres
+
+          # Generate query cache using the postgres service
+          DATABASE_URL=postgres://rustyclint:rustyclint@localhost:5432/rustyclint \
+            cargo sqlx prepare --check || \
+            DATABASE_URL=postgres://rustyclint:rustyclint@localhost:5432/rustyclint \
+            cargo sqlx prepare
+        env:
+          DATABASE_URL: postgres://rustyclint:rustyclint@localhost:5432/rustyclint
+
       - name: Set environment
         id: set-env
         run: |
@@ -97,9 +124,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            DATABASE_URL=postgres://rustyclint:rustyclint@localhost:5432/rustyclint
-          network: host
 
   deploy:
     name: Deploy to AKS

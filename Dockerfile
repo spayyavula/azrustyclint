@@ -8,11 +8,10 @@ COPY . .
 RUN cargo update -p base64ct --precise 1.6.0 && \
     cargo update -p home --precise 0.5.9
 
-# Accept DATABASE_URL as build argument and set as environment variable for sqlx
-ARG DATABASE_URL
-ENV DATABASE_URL=$DATABASE_URL
+# Use sqlx offline mode with pre-generated query cache
+ENV SQLX_OFFLINE=true
 
-# Build with DATABASE_URL available for sqlx compile-time verification
+# Build using the .sqlx cache generated in CI
 RUN cargo build --release --bin rustyclint
 
 # Runtime stage
