@@ -16,6 +16,86 @@ use uuid::Uuid;
 
 use crate::state::AppState;
 
+// y-websocket protocol constants
+const MSG_SYNC: u8 = 0;
+#[allow(dead_code)]
+const MSG_AWARENESS: u8 = 1;
+const SYNC_STEP1: u8 = 0;
+const SYNC_STEP2: u8 = 1;
+const SYNC_UPDATE: u8 = 2;
+
+/// Write a variable-length unsigned integer (lib0 encoding)
+fn write_var_uint(buf: &mut Vec<u8>, mut value: usize) {
+    while value > 0x7f {
+        buf.push((value as u8 & 0x7f) | 0x80);
+        value >>= 7;
+    }
+    buf.push(value as u8);
+}
+
+/// Read a variable-length unsigned integer (lib0 encoding)
+fn read_var_uint(data: &[u8], pos: &mut usize) -> Option<usize> {
+    let mut result: usize = 0;
+    let mut shift = 0;
+    loop {
+        if *pos >= data.len() {
+            return None;
+        }
+        let byte = data[*pos];
+        *pos += 1;
+        result |= ((byte & 0x7f) as usize) << shift;
+        if byte & 0x80 == 0 {
+            break;
+        }
+        shift += 7;
+    }
+    Some(result)
+}
+
+/// Write a byte array with length prefix (lib0 VarUint8Array)
+fn write_var_uint8_array(buf: &mut Vec<u8>, data: &[u8]) {
+    write_var_uint(buf, data.len());
+    buf.extend_from_slice(data);
+}
+
+/// Read a byte array with length prefix (lib0 VarUint8Array)
+fn read_var_uint8_array<'a>(data: &'a [u8], pos: &mut usize) -> Option<&'a [u8]> {
+    let len = read_var_uint(data, pos)?;
+    if *pos + len > data.len() {
+        return None;
+    }
+    let result = &data[*pos..*pos + len];
+    *pos += len;
+    Some(result)
+}
+
+/// Encode a sync step 1 message (state vector request)
+fn encode_sync_step1(state_vector: &[u8]) -> Vec<u8> {
+    let mut buf = Vec::new();
+    buf.push(MSG_SYNC);
+    buf.push(SYNC_STEP1);
+    write_var_uint8_array(&mut buf, state_vector);
+    buf
+}
+
+/// Encode a sync step 2 message (state update response)
+fn encode_sync_step2(update: &[u8]) -> Vec<u8> {
+    let mut buf = Vec::new();
+    buf.push(MSG_SYNC);
+    buf.push(SYNC_STEP2);
+    write_var_uint8_array(&mut buf, update);
+    buf
+}
+
+/// Encode a sync update message
+fn encode_sync_update(update: &[u8]) -> Vec<u8> {
+    let mut buf = Vec::new();
+    buf.push(MSG_SYNC);
+    buf.push(SYNC_UPDATE);
+    write_var_uint8_array(&mut buf, update);
+    buf
+}
+
 // Global room manager (in production, this would be in AppState)
 static ROOM_MANAGER: std::sync::OnceLock<Arc<RwLock<RoomManager>>> = std::sync::OnceLock::new();
 
@@ -91,11 +171,9 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
     let mut broadcast_rx = room.join(user_id, username.clone());
 
     // Send initial sync step 1 (server's state vector)
-    // y-websocket protocol: [messageType, syncType, ...payload]
-    // messageType 0 = sync, syncType 0 = step1 (state vector)
+    // y-websocket protocol: [messageType, syncType, VarUint8Array(payload)]
     let state_vector = room.document.state_vector().await;
-    let mut sync_step1 = vec![0u8, 0u8]; // message type 0 (sync), sync step 0 (step1)
-    sync_step1.extend_from_slice(&state_vector);
+    let sync_step1 = encode_sync_step1(&state_vector);
     let _ = sender.send(Message::Binary(sync_step1)).await;
 
     // Note: UserJoined/UserLeft notifications are not part of y-websocket protocol
@@ -123,18 +201,16 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
                                         continue;
                                     }
 
-                                    // Broadcast to others using y-websocket protocol format
-                                    let mut broadcast_data = vec![0u8, 2u8]; // sync message, update
-                                    broadcast_data.extend_from_slice(&data);
+                                    // Broadcast to others using proper lib0 encoding
+                                    let broadcast_data = encode_sync_update(&data);
                                     room.broadcast_update(broadcast_data);
                                 }
 
                                 CollabMessage::Sync { state_vector } => {
-                                    // Send diff based on client's state vector using y-websocket protocol
+                                    // Send diff based on client's state vector using proper lib0 encoding
                                     match room.document.encode_diff(&state_vector).await {
                                         Ok(diff) => {
-                                            let mut response = vec![0u8, 1u8]; // sync message, step 2
-                                            response.extend_from_slice(&diff);
+                                            let response = encode_sync_step2(&diff);
                                             let _ = sender.send(Message::Binary(response)).await;
                                         }
                                         Err(e) => {
@@ -168,29 +244,36 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
                     }
 
                     Ok(Message::Binary(data)) => {
-                        // Handle y-websocket protocol messages
-                        // Protocol: [messageType, subType (for sync), ...payload]
-                        // messageType 0 = sync, messageType 1 = awareness
-                        if data.len() < 2 {
+                        // Handle y-websocket protocol messages with lib0 encoding
+                        // Protocol: [VarUint(messageType), VarUint(syncType), VarUint8Array(payload)]
+                        if data.is_empty() {
                             continue;
                         }
 
-                        let msg_type = data[0];
+                        let mut pos = 0;
+                        let Some(msg_type) = read_var_uint(&data, &mut pos) else {
+                            tracing::debug!("Failed to read message type");
+                            continue;
+                        };
 
                         match msg_type {
                             0 => {
                                 // Sync message - has sub-type
-                                let sync_type = data[1];
-                                let payload = &data[2..];
+                                let Some(sync_type) = read_var_uint(&data, &mut pos) else {
+                                    tracing::debug!("Failed to read sync type");
+                                    continue;
+                                };
 
                                 match sync_type {
                                     0 => {
                                         // Sync step 1: client sends state vector, respond with step 2 (diff)
-                                        match room.document.encode_diff(payload).await {
+                                        let Some(state_vector) = read_var_uint8_array(&data, &mut pos) else {
+                                            tracing::debug!("Failed to read state vector");
+                                            continue;
+                                        };
+                                        match room.document.encode_diff(state_vector).await {
                                             Ok(diff) => {
-                                                // Send sync step 2 response: [0, 1, ...diff]
-                                                let mut response = vec![0u8, 1u8]; // sync message, step 2
-                                                response.extend_from_slice(&diff);
+                                                let response = encode_sync_step2(&diff);
                                                 let _ = sender.send(Message::Binary(response)).await;
                                             }
                                             Err(e) => {
@@ -200,20 +283,27 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
                                     }
                                     1 => {
                                         // Sync step 2: apply the update (diff from server)
-                                        if let Err(e) = room.document.apply_update(payload).await {
+                                        let Some(update) = read_var_uint8_array(&data, &mut pos) else {
+                                            tracing::debug!("Failed to read update");
+                                            continue;
+                                        };
+                                        if let Err(e) = room.document.apply_update(update).await {
                                             tracing::error!("Failed to apply sync step 2: {}", e);
                                         }
                                     }
                                     2 => {
                                         // Update: apply and broadcast
-                                        if let Err(e) = room.document.apply_update(payload).await {
+                                        let Some(update) = read_var_uint8_array(&data, &mut pos) else {
+                                            tracing::debug!("Failed to read update");
+                                            continue;
+                                        };
+                                        if let Err(e) = room.document.apply_update(update).await {
                                             tracing::error!("Failed to apply update: {}", e);
                                             continue;
                                         }
 
-                                        // Broadcast to others (preserve full message format)
-                                        let mut broadcast_data = vec![0u8, 2u8]; // sync message, update
-                                        broadcast_data.extend_from_slice(payload);
+                                        // Broadcast to others using proper lib0 encoding
+                                        let broadcast_data = encode_sync_update(update);
                                         room.broadcast_update(broadcast_data);
                                     }
                                     _ => {
