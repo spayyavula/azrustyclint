@@ -101,11 +101,13 @@ jobs:
           password: ${{ secrets.ACR_PASSWORD }}
 
       - name: Push to ACR
+        env:
+          SHORT_SHA: ${{ steps.meta.outputs.version }}
         run: |
           docker buildx imagetools create \
-            --tag acrustyclintprod.azurecr.io/rustyclint:${{ github.sha }} \
+            --tag acrustyclintprod.azurecr.io/rustyclint:${SHORT_SHA} \
             --tag acrustyclintprod.azurecr.io/rustyclint:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}
 
   build-sandbox-base:
     name: Build Sandbox Base Image
@@ -221,7 +223,7 @@ jobs:
           az aks command invoke \
             --resource-group rg-rustyclint-prod \
             --name aks-rustyclint-prod \
-            --command "kubectl set image deployment/rustyclint-api api=acrustyclintprod.azurecr.io/rustyclint:${{ github.sha }} -n rustyclint"
+            --command "kubectl set image deployment/rustyclint-api api=acrustyclintprod.azurecr.io/rustyclint:latest -n rustyclint"
           az aks command invoke \
             --resource-group rg-rustyclint-prod \
             --name aks-rustyclint-prod \
