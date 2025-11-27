@@ -9,7 +9,7 @@ use axum::{
     },
     response::Response,
 };
-use rustyclint_collab::{RoomManager, SyncProtocol};
+use rustyclint_collab::RoomManager;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -98,13 +98,9 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
     sync_step1.extend_from_slice(&state_vector);
     let _ = sender.send(Message::Binary(sync_step1)).await;
 
-    // Notify others of join
-    let join_msg = serde_json::to_vec(&ServerMessage::UserJoined {
-        user_id: user_id.to_string(),
-        username: username.clone(),
-    })
-    .unwrap_or_default();
-    room.broadcast_update(join_msg);
+    // Note: UserJoined/UserLeft notifications are not part of y-websocket protocol
+    // They would need a separate signaling channel if needed
+    tracing::info!("User {} ({}) joined room {}", username, user_id, file_id);
 
     // Handle messages
     loop {
@@ -127,31 +123,34 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
                                         continue;
                                     }
 
-                                    // Broadcast to others
-                                    let update_msg = serde_json::to_vec(&ServerMessage::Update { data })
-                                        .unwrap_or_default();
-                                    room.broadcast_update(update_msg);
+                                    // Broadcast to others using y-websocket protocol format
+                                    let mut broadcast_data = vec![0u8, 2u8]; // sync message, update
+                                    broadcast_data.extend_from_slice(&data);
+                                    room.broadcast_update(broadcast_data);
                                 }
 
                                 CollabMessage::Sync { state_vector } => {
-                                    // Send diff based on client's state vector
-                                    let sync_msg = SyncProtocol::create_sync_step1(state_vector);
-                                    let encoded = SyncProtocol::encode(&sync_msg);
-                                    let _ = sender.send(Message::Binary(encoded)).await;
+                                    // Send diff based on client's state vector using y-websocket protocol
+                                    match room.document.encode_diff(&state_vector).await {
+                                        Ok(diff) => {
+                                            let mut response = vec![0u8, 1u8]; // sync message, step 2
+                                            response.extend_from_slice(&diff);
+                                            let _ = sender.send(Message::Binary(response)).await;
+                                        }
+                                        Err(e) => {
+                                            tracing::error!("Failed to encode diff: {}", e);
+                                        }
+                                    }
                                 }
 
                                 CollabMessage::Awareness { user_id: _, cursor } => {
-                                    // Update cursor position and broadcast
+                                    // Update cursor position
                                     if let Some(ref pos) = cursor {
                                         room.update_cursor(&user_id, pos.line);
                                     }
-
-                                    let awareness_msg = serde_json::to_vec(&ServerMessage::Awareness {
-                                        user_id: user_id.to_string(),
-                                        cursor,
-                                    })
-                                    .unwrap_or_default();
-                                    room.broadcast_update(awareness_msg);
+                                    // Note: For proper y-websocket awareness, client should send
+                                    // binary awareness messages (type 1), not JSON
+                                    tracing::debug!("Received JSON awareness update from {}", user_id);
                                 }
 
                                 CollabMessage::Auth { token: _ } => {
@@ -249,12 +248,8 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
     // Leave room
     room.leave(&user_id);
 
-    // Notify others of leave
-    let leave_msg = serde_json::to_vec(&ServerMessage::UserLeft {
-        user_id: user_id.to_string(),
-    })
-    .unwrap_or_default();
-    room.broadcast_update(leave_msg);
+    // Note: UserLeft notifications are not part of y-websocket protocol
+    tracing::info!("User {} left room {}", user_id, file_id);
 
     // Cleanup empty room
     let manager = room_manager.write().await;
