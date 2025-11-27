@@ -91,8 +91,10 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
     let mut broadcast_rx = room.join(user_id, username.clone());
 
     // Send initial sync step 1 (server's state vector)
+    // y-websocket protocol: [messageType, syncType, ...payload]
+    // messageType 0 = sync, syncType 0 = step1 (state vector)
     let state_vector = room.document.state_vector().await;
-    let mut sync_step1 = vec![0u8]; // message type 0
+    let mut sync_step1 = vec![0u8, 0u8]; // message type 0 (sync), sync step 0 (step1)
     sync_step1.extend_from_slice(&state_vector);
     let _ = sender.send(Message::Binary(sync_step1)).await;
 
@@ -168,48 +170,63 @@ async fn handle_collab(socket: WebSocket, file_id: Uuid) {
 
                     Ok(Message::Binary(data)) => {
                         // Handle y-websocket protocol messages
-                        if data.is_empty() {
+                        // Protocol: [messageType, subType (for sync), ...payload]
+                        // messageType 0 = sync, messageType 1 = awareness
+                        if data.len() < 2 {
                             continue;
                         }
 
                         let msg_type = data[0];
-                        let payload = &data[1..];
 
                         match msg_type {
                             0 => {
-                                // Sync step 1: client sends state vector, respond with diff
-                                match room.document.encode_diff(payload).await {
-                                    Ok(diff) => {
-                                        // Send sync step 2 response
-                                        let mut response = vec![1u8]; // message type 1
-                                        response.extend_from_slice(&diff);
-                                        let _ = sender.send(Message::Binary(response)).await;
+                                // Sync message - has sub-type
+                                let sync_type = data[1];
+                                let payload = &data[2..];
+
+                                match sync_type {
+                                    0 => {
+                                        // Sync step 1: client sends state vector, respond with step 2 (diff)
+                                        match room.document.encode_diff(payload).await {
+                                            Ok(diff) => {
+                                                // Send sync step 2 response: [0, 1, ...diff]
+                                                let mut response = vec![0u8, 1u8]; // sync message, step 2
+                                                response.extend_from_slice(&diff);
+                                                let _ = sender.send(Message::Binary(response)).await;
+                                            }
+                                            Err(e) => {
+                                                tracing::error!("Failed to encode diff: {}", e);
+                                            }
+                                        }
                                     }
-                                    Err(e) => {
-                                        tracing::error!("Failed to encode diff: {}", e);
+                                    1 => {
+                                        // Sync step 2: apply the update (diff from server)
+                                        if let Err(e) = room.document.apply_update(payload).await {
+                                            tracing::error!("Failed to apply sync step 2: {}", e);
+                                        }
+                                    }
+                                    2 => {
+                                        // Update: apply and broadcast
+                                        if let Err(e) = room.document.apply_update(payload).await {
+                                            tracing::error!("Failed to apply update: {}", e);
+                                            continue;
+                                        }
+
+                                        // Broadcast to others (preserve full message format)
+                                        let mut broadcast_data = vec![0u8, 2u8]; // sync message, update
+                                        broadcast_data.extend_from_slice(payload);
+                                        room.broadcast_update(broadcast_data);
+                                    }
+                                    _ => {
+                                        tracing::debug!("Unknown sync sub-type: {}", sync_type);
                                     }
                                 }
                             }
                             1 => {
-                                // Sync step 2: apply the update
-                                if let Err(e) = room.document.apply_update(payload).await {
-                                    tracing::error!("Failed to apply sync step 2: {}", e);
-                                }
-                            }
-                            2 => {
-                                // Update: apply and broadcast
-                                if let Err(e) = room.document.apply_update(payload).await {
-                                    tracing::error!("Failed to apply update: {}", e);
-                                    continue;
-                                }
-
-                                // Broadcast to others (with message type prefix)
-                                let mut broadcast_data = vec![2u8];
-                                broadcast_data.extend_from_slice(payload);
-                                room.broadcast_update(broadcast_data);
+                                // Awareness message - broadcast to others as-is
+                                room.broadcast_update(data.to_vec());
                             }
                             _ => {
-                                // Unknown message type (could be awareness, etc.)
                                 tracing::debug!("Unknown y-websocket message type: {}", msg_type);
                             }
                         }

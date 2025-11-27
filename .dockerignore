@@ -1,0 +1,39 @@
+# Dependencies
+frontend/node_modules
+node_modules
+target
+
+# Build artifacts
+frontend/dist
+*.log
+
+# IDE and editor
+.idea
+.vscode
+*.swp
+*.swo
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Testing
+*.test.ts
+*.test.tsx
+__tests__
+
+# Git
+.git
+.gitignore
+
+# Docker
+.docker
+docker-compose*.yml
+
+# CI/CD
+.github
+
+# Local config
+config/local.toml
+.env*
