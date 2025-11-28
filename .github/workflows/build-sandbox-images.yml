@@ -1,0 +1,103 @@
+name: Build Sandbox Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_all:
+        description: 'Build all sandbox images'
+        required: false
+        default: true
+        type: boolean
+  push:
+    paths:
+      - 'docker/sandbox-*.Dockerfile'
+
+env:
+  ACR_REGISTRY: acrustyclintprod.azurecr.io
+
+jobs:
+  build-sandbox-base:
+    name: Build Sandbox Base Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push sandbox base image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/sandbox-base.Dockerfile
+          push: true
+          tags: ${{ env.ACR_REGISTRY }}/sandbox-base:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-sandbox-images:
+    name: Build Sandbox ${{ matrix.sandbox.name }}
+    runs-on: ubuntu-latest
+    needs: build-sandbox-base
+
+    strategy:
+      fail-fast: false
+      matrix:
+        sandbox:
+          - name: python
+            file: docker/sandbox-python.Dockerfile
+          - name: node
+            file: docker/sandbox-node.Dockerfile
+          - name: rust
+            file: docker/sandbox-rust.Dockerfile
+          - name: go
+            file: docker/sandbox-go.Dockerfile
+          - name: java
+            file: docker/sandbox-java.Dockerfile
+          - name: cpp
+            file: docker/sandbox-cpp.Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if Dockerfile exists
+        id: check_file
+        run: |
+          if [[ -f "${{ matrix.sandbox.file }}" ]]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.check_file.outputs.exists == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Azure Container Registry
+        if: steps.check_file.outputs.exists == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push sandbox image
+        if: steps.check_file.outputs.exists == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.sandbox.file }}
+          push: true
+          tags: ${{ env.ACR_REGISTRY }}/sandbox-${{ matrix.sandbox.name }}:latest
+          build-args: |
+            BASE_IMAGE=${{ env.ACR_REGISTRY }}/sandbox-base:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
