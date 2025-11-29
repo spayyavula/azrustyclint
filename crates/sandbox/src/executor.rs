@@ -87,15 +87,21 @@ impl SandboxExecutor {
             )
             .await?;
 
-        if let StartExecResults::Attached { mut input, .. } = self
+        if let StartExecResults::Attached { mut input, mut output } = self
             .manager
             .docker()
             .start_exec(&exec.id, None)
             .await?
         {
+            use futures_util::StreamExt;
             use tokio::io::AsyncWriteExt;
+
+            // Write code to stdin
             input.write_all(request.code.as_bytes()).await?;
             input.shutdown().await?;
+
+            // Wait for the write command to complete by consuming the output stream
+            while let Some(_) = output.next().await {}
         }
 
         // Build execution command based on language
