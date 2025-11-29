@@ -81,6 +81,7 @@ impl SandboxExecutor {
                     attach_stdin: Some(true),
                     attach_stdout: Some(true),
                     attach_stderr: Some(true),
+                    working_dir: Some("/code".to_string()),
                     ..Default::default()
                 },
             )
@@ -109,6 +110,7 @@ impl SandboxExecutor {
                     cmd: Some(run_cmd),
                     attach_stdout: Some(true),
                     attach_stderr: Some(true),
+                    working_dir: Some("/code".to_string()),
                     ..Default::default()
                 },
             )
