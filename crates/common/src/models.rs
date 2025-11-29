@@ -44,19 +44,20 @@ impl Language {
     }
 
     /// Get the Docker image for this language's sandbox.
+    /// Images are hosted in Azure Container Registry.
     pub fn docker_image(&self) -> &'static str {
         match self {
-            Language::Rust => "rustyclint/sandbox-rust:latest",
-            Language::Python => "rustyclint/sandbox-python:latest",
-            Language::JavaScript | Language::TypeScript => "rustyclint/sandbox-node:latest",
-            Language::Go => "rustyclint/sandbox-go:latest",
-            Language::Java => "rustyclint/sandbox-java:latest",
-            Language::CSharp => "rustyclint/sandbox-dotnet:latest",
-            Language::Cpp | Language::C => "rustyclint/sandbox-cpp:latest",
-            Language::Ruby => "rustyclint/sandbox-ruby:latest",
-            Language::Php => "rustyclint/sandbox-php:latest",
-            Language::Swift => "rustyclint/sandbox-swift:latest",
-            Language::Kotlin => "rustyclint/sandbox-kotlin:latest",
+            Language::Rust => "acrustyclintprod.azurecr.io/sandbox-rust:latest",
+            Language::Python => "acrustyclintprod.azurecr.io/sandbox-python:latest",
+            Language::JavaScript | Language::TypeScript => "acrustyclintprod.azurecr.io/sandbox-node:latest",
+            Language::Go => "acrustyclintprod.azurecr.io/sandbox-go:latest",
+            Language::Java => "acrustyclintprod.azurecr.io/sandbox-java:latest",
+            Language::CSharp => "acrustyclintprod.azurecr.io/sandbox-dotnet:latest",
+            Language::Cpp | Language::C => "acrustyclintprod.azurecr.io/sandbox-cpp:latest",
+            Language::Ruby => "acrustyclintprod.azurecr.io/sandbox-ruby:latest",
+            Language::Php => "acrustyclintprod.azurecr.io/sandbox-php:latest",
+            Language::Swift => "acrustyclintprod.azurecr.io/sandbox-swift:latest",
+            Language::Kotlin => "acrustyclintprod.azurecr.io/sandbox-kotlin:latest",
         }
     }
 }
