@@ -81,8 +81,8 @@ impl ContainerManager {
                 },
             ]),
             tmpfs: Some(HashMap::from([
-                ("/tmp".to_string(), "rw,noexec,nosuid,size=64m".to_string()),
-                ("/code".to_string(), "rw,noexec,nosuid,size=32m".to_string()),
+                ("/tmp".to_string(), "rw,noexec,nosuid,size=64m,mode=1777".to_string()),
+                ("/code".to_string(), "rw,nosuid,size=32m,mode=1777".to_string()),
             ])),
             ..Default::default()
         };
